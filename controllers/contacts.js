@@ -1,8 +1,8 @@
-const contactsOperations = require("../model/contacts");
+const { Contact } = require("../model/contacts");
 
 async function listContacts(req, res, next) {
   try {
-    const contacts = await contactsOperations.listContacts();
+    const contacts = await Contact.find({}, "_id name email phone favorite");
     res.json({
       status: "success",
       code: 200,
@@ -18,7 +18,10 @@ async function listContacts(req, res, next) {
 async function getContactById(req, res, next) {
   try {
     const { contactId } = req.params;
-    const result = await contactsOperations.getContactById(contactId);
+    const result = await Contact.findById(
+      contactId,
+      "_id name email phone favorite"
+    );
     if (!result) {
       const error = new Error(`Contact by id=${contactId} is not found`);
       error.status = 404;
@@ -38,7 +41,7 @@ async function getContactById(req, res, next) {
 
 async function addContact(req, res, next) {
   try {
-    const result = await contactsOperations.addContact(req.body);
+    const result = await Contact.create(req.body);
     res.status(201).json({
       status: "success",
       code: 201,
@@ -54,7 +57,7 @@ async function addContact(req, res, next) {
 async function removeContact(req, res, next) {
   try {
     const { contactId } = req.params;
-    const result = await contactsOperations.removeContact(contactId);
+    const result = await Contact.findByIdAndDelete(contactId);
     if (!result) {
       const error = new Error(`Contact by id=${contactId} is not found`);
       error.status = 404;
@@ -73,9 +76,42 @@ async function removeContact(req, res, next) {
 async function updateContact(req, res, next) {
   try {
     const { contactId } = req.params;
-    const result = await contactsOperations.updateContact(contactId, req.body);
+    const result = await Contact.findByIdAndUpdate(contactId, req.body, {
+      new: true,
+    });
     if (!result) {
       const error = new Error(`Contact by id=${contactId} is not found`);
+      error.status = 404;
+      throw error;
+    }
+    res.json({
+      status: "success",
+      code: 200,
+      data: {
+        result,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function updateFavorite(req, res, next) {
+  try {
+    const { contactId } = req.params;
+    const { favorite } = req.body;
+    if (!favorite) {
+      const error = new Error("Missing field favorite");
+      error.status = 400;
+      throw error;
+    }
+    const result = await Contact.findByIdAndUpdate(
+      contactId,
+      { favorite },
+      { new: true }
+    );
+    if (!result) {
+      const error = new Error("Not found");
       error.status = 404;
       throw error;
     }
@@ -97,4 +133,5 @@ module.exports = {
   addContact,
   removeContact,
   updateContact,
+  updateFavorite,
 };
