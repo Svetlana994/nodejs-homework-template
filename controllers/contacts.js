@@ -1,8 +1,12 @@
-const { Contact } = require("../model/contacts");
+const { Contact } = require("../model");
 
 async function listContacts(req, res, next) {
+  const { _id } = req.user;
   try {
-    const contacts = await Contact.find({}, "_id name email phone favorite");
+    const contacts = await Contact.find(
+      { owner: _id },
+      "_id name email phone favorite"
+    );
     res.json({
       status: "success",
       code: 200,
@@ -41,7 +45,8 @@ async function getContactById(req, res, next) {
 
 async function addContact(req, res, next) {
   try {
-    const result = await Contact.create(req.body);
+    const { _id } = req.user;
+    const result = await Contact.create({ ...req.body, owner: _id });
     res.status(201).json({
       status: "success",
       code: 201,
