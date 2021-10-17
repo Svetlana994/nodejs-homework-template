@@ -1,11 +1,18 @@
 const { Conflict, NotFound, BadRequest, Unauthorized } = require("http-errors");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const gravatar = require("gravatar");
+const Jimp = require("jimp");
+const fs = require("fs/promises");
+const path = require("path");
 require("dotenv").config();
 
 const { User } = require("../model/user");
 
 const { SECRET_KEY } = process.env;
+
+const tempDir = path.join(__dirname, "tmp");
+const uploadDir = path.join(__dirname, "../", "public/avatars");
 
 async function signup(req, res, next) {
   try {
@@ -18,7 +25,12 @@ async function signup(req, res, next) {
     const saltRounds = 10;
     const salt = bcrypt.genSaltSync(saltRounds);
     const hashPassword = bcrypt.hashSync(password, salt);
-    const result = await User.create({ email, password: hashPassword });
+    const userAvatar = gravatar.url(email, { s: "200", r: "pg", d: "retro" });
+    const result = await User.create({
+      email,
+      password: hashPassword,
+      avatarURL: userAvatar,
+    });
 
     res.status(201).json({
       status: "success",
@@ -91,9 +103,52 @@ async function current(req, res, next) {
   }
 }
 
+async function updateAvatar(req, res, next) {
+  try {
+    const { path: tempStorage, originalname } = req.file;
+    const { id } = req.user;
+
+    const user = await User.findOne({ id });
+
+    const [extention] = originalname.split(".").reverse();
+    const newFileName = `user_new-ava_${user.id}.${extention}`;
+
+    Jimp.read(tempStorage, (err, image) => {
+      if (err) throw err;
+      image
+        .resize(250, 250) // resize
+        .write(newFileName); // save
+    });
+
+    const resultStorage = path.join(uploadDir, newFileName);
+    await fs.rename(tempStorage, resultStorage);
+
+    const photo = path.join("/avatars", newFileName);
+
+    await User.findByIdAndUpdate(
+      user.id,
+      {
+        avatarURL: photo,
+      },
+      {
+        new: true,
+      }
+    );
+
+    res.json({
+      message: "success",
+      code: 200,
+      avatarURL: photo,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   signup,
   login,
   logout,
   current,
+  updateAvatar,
 };
